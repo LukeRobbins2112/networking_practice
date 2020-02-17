@@ -14,6 +14,9 @@
 
 #include "utils.h"
 
+// Environment variables - declared in unistd.h
+extern char **environ;
+
 // (1) create socket object
 // (1.5) configure socket to make debugging easier
 // (2) bind to port (INADDR_ANY)
@@ -110,6 +113,9 @@ int parseUri(char* uri, char* filename, char* cgiArgs){
         strcpy(filename, ".");
         strcat(filename, uri);
 
+        printf("cgi script: %s\n", filename);
+        printf("cgi args: %s\n", cgiArgs);
+
         // Tell caller that the content is dynamic
         return 0;
     }
@@ -119,6 +125,25 @@ int parseUri(char* uri, char* filename, char* cgiArgs){
 
 void serveDynamic(int clientFd, char* filename, char* cgiArgs){
     // @TODO implement this function
+    char buf[MAX_LINE];
+    char* envList[] = { NULL };
+
+    // Return first part of HTTP response
+    sprintf(buf, "HTTP/1.1 200 OK \r\n");
+    sprintf(buf, "%sServer: TINY Web Server", buf);
+    int responseHeaderLen = strlen(buf);
+    if ((write(clientFd, buf, responseHeaderLen)) < responseHeaderLen){
+        printf("Error writing dynamic response header");
+    }
+
+    // Execute CGI "script" - in our case most likely a C executable
+    if (fork() == 0){   // Child
+        setenv("QUERY_STRING", cgiArgs, 1);
+        dup2(clientFd, STDOUT_FILENO);
+        execve(filename, envList, environ);
+    }
+
+    wait(NULL);
 }
 
 void serviceClient(int clientFd){
@@ -133,9 +158,7 @@ void serviceClient(int clientFd){
 
     sscanf(buf, "%s %s %s", method, uri, version);
 
-    // printf("method: %s\n", method);
-    // printf("uri: %s\n", uri);
-    // printf("version: %s\n", version);
+    printf("method - uri - version: %s - %s - %s\n", method, uri, version);
 
     if (strncasecmp(method, "GET", 3)){
         printf("Error, we can only use the GET method right now");
