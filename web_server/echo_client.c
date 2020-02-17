@@ -63,6 +63,14 @@ int main(int argc, char** argv){
         printf("Error writing to server");
     }
 
+    // Receive response, print
+    char responseBuf[MAX_LINE];
+    int bytesRead = 0;
+    while((bytesRead = read(clientFd, responseBuf, MAX_LINE - 1)) > 0){
+        responseBuf[bytesRead] = '\0';
+        printf("%s", responseBuf);
+    }
+
     return 0;
 
 }

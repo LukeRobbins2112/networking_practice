@@ -4,11 +4,13 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netdb.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "utils.h"
 
@@ -63,6 +65,21 @@ void serveStatic(int clientFd, char* filename, int filesize){
     if (write(clientFd, buf, responseLen) < responseLen){
         printf("Error on writing response header");
     }
+
+    // Response body
+    if ((docFd = open(filename, O_RDONLY, 0)) < 0){
+        printf("Error opening file");
+        return;
+    }
+
+    documentPtr = mmap(0, filesize, PROT_READ, MAP_PRIVATE, docFd, 0);
+    close(docFd);
+    if (write(clientFd, documentPtr, filesize) < filesize){
+        printf("Error writing file contents");
+        return;
+    }
+    munmap(documentPtr, filesize);
+
 }
 
 void serviceClient(int clientFd){
@@ -76,9 +93,9 @@ void serviceClient(int clientFd){
 
     sscanf(buf, "%s %s %s", method, uri, version);
 
-    printf("method: %s\n", method);
-    printf("uri: %s\n", uri);
-    printf("version: %s\n", version);
+    // printf("method: %s\n", method);
+    // printf("uri: %s\n", uri);
+    // printf("version: %s\n", version);
 
     if (strncasecmp(method, "GET", 3)){
         printf("Error, we can only use the GET method right now");
@@ -89,16 +106,16 @@ void serviceClient(int clientFd){
     struct stat filestats;
     strcpy(filename, ".");
     strcat(filename, uri);
-    printf("relative file path: %s\n", filename);
+    //printf("relative file path: %s\n", filename);
 
     if (stat(filename, &filestats) < 0){
         printf("Error getting file stats");
         return;
     }
 
-    printf("File size: %lld\n", filestats.st_size);
+    //printf("File size: %lld\n", filestats.st_size);
 
-    //serveStatic(clientFd, filename, filestats.st_size);
+    serveStatic(clientFd, filename, filestats.st_size);
 
 }
 
