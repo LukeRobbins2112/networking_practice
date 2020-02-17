@@ -82,9 +82,49 @@ void serveStatic(int clientFd, char* filename, int filesize){
 
 }
 
+int parseUri(char* uri, char* filename, char* cgiArgs){
+    char* argsPtr;
+
+
+    if (!strstr(filename, "cgi-bin")){  // Static
+
+        // Relative path to static content
+        strcpy(filename, ".");
+        strcat(filename, uri);
+
+        // Don't need cgi args
+        strcpy(cgiArgs, "");
+
+        // Tell caller that the content is static
+        return 1;
+    } else {                            // Dynamic
+        argsPtr = strstr(uri, "?");
+        if (argsPtr){
+            strcpy(cgiArgs, argsPtr + 1);
+            *argsPtr = '\0';
+        } else {
+            strcpy(cgiArgs, "");
+        }
+
+        // With the '?' changed to '\0', the filename now excludes the args
+        strcpy(filename, ".");
+        strcat(filename, uri);
+
+        // Tell caller that the content is dynamic
+        return 0;
+    }
+
+
+}
+
+void serveDynamic(int clientFd, char* filename, char* cgiArgs){
+    // @TODO implement this function
+}
+
 void serviceClient(int clientFd){
 
-    char buf[MAX_LINE], method[MAX_LINE], uri[MAX_LINE], version[MAX_LINE], filename[MAX_LINE];
+    char buf[MAX_LINE];
+    char method[MAX_LINE], uri[MAX_LINE], version[MAX_LINE], filename[MAX_LINE], cgiArgs[MAX_LINE];
 
     // Get the request line
     if ((read(clientFd, buf, MAX_LINE)) < 0){
@@ -102,20 +142,22 @@ void serviceClient(int clientFd){
         return;
     }
 
-    // File name and info
-    struct stat filestats;
-    strcpy(filename, ".");
-    strcat(filename, uri);
-    //printf("relative file path: %s\n", filename);
+    int is_static = parseUri(uri, filename, cgiArgs);
 
+    // File stats
+    struct stat filestats;
     if (stat(filename, &filestats) < 0){
         printf("Error getting file stats");
         return;
     }
 
     //printf("File size: %lld\n", filestats.st_size);
+    if (is_static){
+        serveStatic(clientFd, filename, filestats.st_size);
+    } else {
+        serveDynamic(clientFd, filename, cgiArgs);
+    }
 
-    serveStatic(clientFd, filename, filestats.st_size);
 
 }
 
